@@ -12,6 +12,6 @@ Install OpenCV for Ubuntu: [here](https://github.com/jayrambhia/Install-OpenCV)
 - For each TP, go to TP directory
 
 ```bash
-make
+make all
 make run
 ```

@@ -1,6 +1,4 @@
-#include "mysift.h"
-
-#include <windows.h>
+#include "mysift_LA.h"
 
 #include <iostream>
 #include <opencv2/features2d.hpp>  // For cv::KeyPointsFilter
@@ -8,6 +6,8 @@
 
 #include "graphicwnd.h"
 #include "opencv_utility.h"
+
+// #include <windows.h>
 
 using namespace std;
 
@@ -52,18 +52,21 @@ void MySIFT::buildDoGScaleSpace()
     // Build the scales
     this->scales.push_back(this->scaleBase);
     for(int i = 1; i < this->nbLayers; i++) {
-        this->scales.push_back(this->scales[i - 1] * this->scaleFactor);
+        this->scales.push_back(this->scales[i - 1] * this->scaleFactor);  // s[i] = n * s[i-1]
     }
     // Print scales
-    for(int i = 0; i < this->nbLayers; i++) {
-        cout << this->scales[i] << endl;
-    }
+    //    for(int i=0; i<this->nbLayers; i++) {
+    //        cout<<this->scales[i]<<endl;
+    //    }
 
     // Build pyr
-    for(int i = 0; i < this->nbLayers; i++) {
+    for(int i = 0; i < nbLayers; i++) {
         cv::Mat img_dst;
-        cv::GaussianBlur(this->base, img_dst, cv::Size(51, 51), this->scales[i]);
-        this->pyr.push_back(img_dst);
+        cv::GaussianBlur(base,
+                         img_dst,
+                         cv::Size(0, 0),
+                         scales[i]);  // convolution entre l'image et le filtre Gaussian qui a �tendu = scale[i]
+        pyr.push_back(img_dst);
     }
 
     // Build dogpyr
@@ -71,6 +74,7 @@ void MySIFT::buildDoGScaleSpace()
         this->dogpyr.push_back(this->pyr[i + 1] - this->pyr[i]);
     }
 
+    // Affiche multi �chelle
     stringstream ss;
     CListImage2DWnd* wnd_pyr = new CListImage2DWnd();
     CListImage2DWnd* wnd_dogpyr = new CListImage2DWnd();
@@ -219,19 +223,21 @@ void MySIFT::findScaleSpaceExtrema()
     // TODO 2: find local extrema in the DoG scale-space and add them into the 'localExtrema' vector
     // Local extrema will be stored as 3D points (the z component should be used for the scale index)
     // Add the code HERE
-    float check_point;
-    float neightbor_point;
+    float check_point;      // valeur du point au milieu
+    float neightbor_point;  // valeur des voisinages
+    cv::Mat img = base.clone();
     for(unsigned int i = 1; i < dogpyr.size() - 1;
-        i++) {  // on ne cherche pas les points clefs dans les images des deux c�t�s
-        for(int x = 1; x < dogpyr[i].cols - 1; x++) {  // on ne cherche pas les points clefs dans le contour
+        i++) {  // on ne cherche pas les points clefs sur le 1er image et le dernier image
+        for(int x = 1; x < dogpyr[i].cols - 1; x++) {  // on ne cherche pas les points clefs sur le contour
             for(int y = 1; y < dogpyr[i].rows - 1; y++) {
                 // value of check point
                 check_point = dogpyr[i].at<float>(y, x);
                 if(check_point > contrastThreshold) {
                     // Consider point(x,y) of image dogpyr[i]
-                    int maxima = 0;
-                    int minima = 0;
-                    for(int img_index = -1; img_index <= 1; img_index++) {  // comparer avec les voisinages
+                    int maxima = 0;  // nombre des points qui sont sup�rieur au checkpoint
+                    int minima = 0;  // nombre des points qui sont inf�rieur au checkpoint
+                    for(int img_index = -1; img_index <= 1;
+                        img_index++) {  // comparer le check point avec les voisinages
                         for(int x_index = -1; x_index <= 1; x_index++) {
                             for(int y_index = -1; y_index <= 1; y_index++) {
                                 // value of the neighbor point
@@ -245,17 +251,27 @@ void MySIFT::findScaleSpaceExtrema()
                             }
                         }
                     }
-                    if((maxima == 1) || (minima == 1)) {
+                    if((maxima == 1) ||
+                       (minima == 1)) {  // maxima == 1 car on comparer le chekcpoint avec lui-meme une fois
                         cv::Point3i _localExtrema;
                         _localExtrema.x = x;
                         _localExtrema.y = y;
-                        _localExtrema.z = scales[i];
+                        _localExtrema.z = i;
                         localExtrema.push_back(_localExtrema);
+
+                        cv::Point2i pt;  // cr�er un point pour dessiner un cross sur l'image
+                        pt.x = x;
+                        pt.y = y;
+                        drawCross(img, pt);  // dessiner le local extrema sur l'image
                     }
                 }
             }
         }
     }
+
+    CListImage2DWnd* wnd = new CListImage2DWnd();
+    wnd->AddImage(img, "Locaux Extrema");
+    wnd->show();
 
     cout << localExtrema.size() << " local extrema found." << endl;
 
@@ -310,25 +326,24 @@ void MySIFT::setDominantOrientation(cv::KeyPoint& kpt) const
                     // Add code here
                     float angle = 0;
                     float norm = 0;
-                    float y_cor = 0;
-                    float x_cor = 0;
-                    int index_bin = 0;
+                    float y_cor = 0;    // la d�riv� en axe y
+                    float x_cor = 0;    // la d�riv� en axe x
+                    int index_bin = 0;  // l'indice du bin � laquelle appartient le point (nx,ny)
 
-                    y_cor = img.at<float>(ny + 1, nx) - img.at<float>(ny - 1, nx);
-                    x_cor = img.at<float>(ny, nx + 1) - img.at<float>(ny, nx - 1);
-
-                    // Calcul de magnitude
-                    norm = std::sqrt(x_cor * x_cor + y_cor * y_cor);
+                    y_cor = (img.at<float>(ny + 1, nx) - img.at<float>(ny - 1, nx)) / 2;  // la d�riv� en axe y
+                    x_cor = (img.at<float>(ny, nx + 1) - img.at<float>(ny, nx - 1)) / 2;  // la d�riv� en axe x
 
                     // Calcul d'orientation
                     angle = std::atan2(y_cor, x_cor);
-                    angle = angle * 180 / M_PI;  // passer de radian � degree
-                    if(angle < 0) {
-                        angle += 360;  // car la sortie de la fonction atan2 est entre [-pi;pi], donc on doit le modify
-                                       // � [0;360]
-                    }
-                    index_bin = (int)angle / (360 / nbBinsOrientation);  // calcul de l'indice de la corbeille �
-                                                                         // laquelle appartient le point (nx,ny)
+                    angle = angle * 180 / M_PI + 180;  // passer de radian � degree
+
+                    // Calcul de magnitude
+                    norm = std::sqrt(x_cor * x_cor + y_cor * y_cor);
+                    norm *= g.at<float>(y + radius, x + radius);  // weight the magnitude by Gaussian value g[x,y]
+
+                    index_bin =
+                        (int)angle /
+                        (360 / nbBinsOrientation);  // calcul de l'indice du bin � laquelle appartient le point (nx,ny)
 
                     hist[index_bin] += norm;  // mis � jour la valeur de l'histogram
                 }
@@ -340,15 +355,14 @@ void MySIFT::setDominantOrientation(cv::KeyPoint& kpt) const
     // and assign the corresponding angle to kpt.angle
 
     // Add code here
-    int index_bin_max = 0;
-    for(i = 0; i < nbBinsOrientation; i++) {
-        if(hist[i] > hist[index_bin_max]) {
-            index_bin_max = i;
+    int index_bin_max = 0;                    // choisir le 1er bin comme la valeur maximale
+    for(i = 0; i < nbBinsOrientation; i++) {  // incr�menter � tous les bins
+        if(hist[i] > hist[index_bin_max]) {   // si la valeur d'un bin est sup�rieur � la valeur maximale
+            index_bin_max = i;                // on prends cet indice
         }
     }
-    cout << "Index Max : " << index_bin_max << "   "
-         << "Norm : " << hist[index_bin_max] << endl;
-    kpt.angle = index_bin_max;
+    //    cout<<"Index Max : "<<index_bin_max<<"   "<<"Norm : "<<hist[index_bin_max]<<endl;
+    kpt.angle = (index_bin_max)*2 * M_PI / nbBinsOrientation;  // passer l'angle dominant en degr�e
 }
 
 void MySIFT::computeDescriptor(const cv::KeyPoint& kpt, float* dst)
