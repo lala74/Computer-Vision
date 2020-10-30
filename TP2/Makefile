@@ -7,13 +7,13 @@ CXXFLAGS += -c -std=c++11 -Wall -O2 -fPIC
 CFLAGS += -c -Wall -O2
 LDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets Qt5Gui opencv4)
 
-BASE_OBJECTS 	=			dialogparams.o \
-							graph_LA.o \
-							graphicwnd.o \
-							opencv_utility.o \
-							main_LA.o
+BASE_OBJECTS 	=			src/dialogparams.o \
+							src/graph.o \
+							src/graphicwnd.o \
+							src/opencv_utility.o \
+							main.o
 
-TARGET 			=			main_LA
+TARGET 			=			main
 
 .PHONY: all all_
 all_: $(TARGET) ; $(info Compiling with ${CXX})
