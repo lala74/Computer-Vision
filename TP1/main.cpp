@@ -17,6 +17,16 @@ int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
     cv::Mat img1, img2;
+    cv::String img1Path, img2Path;
+
+    // Get image name from arguments
+    if(argc == 3) {
+        img1Path = argv[1];
+        img2Path = argv[2];
+    } else {
+        img1Path = "./images/test1.jpg";
+        img2Path = "./images/test2.jpg";
+    }
 
     // This ratio is used to select good matches.
     // A match will be considered as "good" if its distance is below the distance
@@ -24,16 +34,16 @@ int main(int argc, char** argv)
     float goodMatchRatio;
 
     //    img1 = cv::imread("./images/table01_640x480.jpg", cv::IMREAD_GRAYSCALE);
-    img1 = cv::imread("./images/test1.jpg", cv::IMREAD_GRAYSCALE);
+    img1 = cv::imread(img1Path, cv::IMREAD_GRAYSCALE);
     if(img1.data == nullptr) {
-        cout << "Cannot open ./images/bep1.jpg" << endl;
+        cout << "Cannot open " << img1Path << endl;
         return -1;
     }
 
     //    img2 = cv::imread("./images/table02_640x480.jpg", cv::IMREAD_GRAYSCALE);
-    img2 = cv::imread("./images/test2.jpg", cv::IMREAD_GRAYSCALE);
+    img2 = cv::imread(img2Path, cv::IMREAD_GRAYSCALE);
     if(img1.data == nullptr) {
-        cout << "Cannot open ./images/bep2.jpg" << endl;
+        cout << "Cannot open " << img2Path << endl;
         return -1;
     }
 
